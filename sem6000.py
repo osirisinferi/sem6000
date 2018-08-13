@@ -5,6 +5,7 @@ import pdb
 import uuid
 
 class SEMSocket():
+    password = "0000"
     powered = False
     voltage = 0
     current = 0
@@ -23,6 +24,7 @@ class SEMSocket():
 
         self.custom_service = self.btle_device.getServiceByUUID(0xfff0)
         self.read_char      = self.custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
+        print(self.read_char.read())
         self.write_char     = self.custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
         self.notify_char    = self.custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
         self.btle_device.setDelegate(self.btle_handler)
@@ -30,7 +32,7 @@ class SEMSocket():
     class BTLEMessage():
         MAGIC_START = bytearray([0x0f])
         MAGIC_END = bytearray([0xff, 0xff])
-        __data = bytearray(MAGIC_START + bytearray(1) + MAGIC_END) # +1 is for the length field
+        __data = bytearray()
         __cmd = bytearray(1) # cmd cannot be empty
         __payload = bytearray()
 
@@ -63,9 +65,9 @@ class SEMSocket():
 
         def __calc_checksum(self):
             checksum = 1
-            for i in range(2, self.__data[1] - 2):
+            for i in range(2, self.__data[1] + 2):
                 checksum += self.__data[i]
-            self.__data[-3] = checksum
+            self.__data[-3] = checksum & 0xff
 
         def __calc_length(self):
             self.__data[1] = 1 + len(self.__payload) + 1 # cmd + payload + checksum
@@ -126,18 +128,37 @@ class SEMSocket():
 
     def login(self, password):
         print("Login")
+        self.password = password
         cmd = bytearray([0x17])
         payload = bytearray()
         payload.append(0x00)
         payload.append(0x00)
-        payload.append(int(password[0]))
-        payload.append(int(password[1]))
-        payload.append(int(password[2]))
-        payload.append(int(password[3]))
+        payload.append(int(self.password[0]))
+        payload.append(int(self.password[1]))
+        payload.append(int(self.password[2]))
+        payload.append(int(self.password[3]))
         payload.append(0x00)
         payload.append(0x00)
         payload.append(0x00)
         payload.append(0x00)
+        msg = self.BTLEMessage(self, cmd, payload)
+        msg.send()
+
+    def changePassword(self, newPassword):
+        print("Change Password")
+        cmd = bytearray([0x17])
+        payload = bytearray()
+        payload.append(0x00)
+        payload.append(0x01)
+        payload.append(int(newPassword[0]))
+        payload.append(int(newPassword[1]))
+        payload.append(int(newPassword[2]))
+        payload.append(int(newPassword[3]))
+        payload.append(int(self.password[0]))
+        payload.append(int(self.password[1]))
+        payload.append(int(self.password[2]))
+        payload.append(int(self.password[3]))
+        self.password = newPassword
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
 
