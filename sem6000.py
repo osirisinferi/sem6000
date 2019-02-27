@@ -1,11 +1,11 @@
 from bluepy import btle
 import struct
 import time
-import pdb
 import uuid
 
 class SEMSocket():
     password = "0000"
+    auto_reconnect_timeout = None
     powered = False
     voltage = 0
     current = 0
@@ -16,18 +16,19 @@ class SEMSocket():
     read_char = None
     write_char = None
     notify_char = None
+    connected = False
 
-    def __init__(self, mac):
+    def __init__(self, mac, auto_reconnect_timeout = None):
         self.mac_address = mac
-        self.btle_device = btle.Peripheral(self.mac_address,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
-        self.btle_handler = self.BTLEHandler(self)
+        self.auto_reconnect_timeout = auto_reconnect_timeout
+        try:
+            self.reconnect()
+        except self.NotConnectedException:
+            # initial connection may fail. It is up to the code what to do
+            pass
 
-        self.custom_service = self.btle_device.getServiceByUUID(0xfff0)
-        self.read_char      = self.custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
-        print(self.read_char.read())
-        self.write_char     = self.custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
-        self.notify_char    = self.custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
-        self.btle_device.setDelegate(self.btle_handler)
+    class NotConnectedException(Exception):
+        pass
 
     class BTLEMessage():
         MAGIC_START = bytearray([0x0f])
@@ -73,6 +74,9 @@ class SEMSocket():
             self.__data[1] = 1 + len(self.__payload) + 1 # cmd + payload + checksum
 
         def send(self):
+            if not self.__btle_device.connected:
+                self.__btle_device.reconnect(self.__btle_device.auto_reconnect_timeout)
+
             self.__btle_device.write_char.write(self.__data, True)
             self.__btle_device.btle_device.waitForNotifications(5)
 
@@ -110,7 +114,6 @@ class SEMSocket():
                 print ("Unknown message from Handle: 0x" + format(cHandle,'02X') + " Value: "+ format(data))
 
     def getStatus(self):
-        print("GetStatus")
         #15, 5, 4, 0, 0, 0, 5, -1, -1
         cmd = bytearray([0x04])
         payload = bytearray([0x00, 0x00, 0x00])
@@ -118,7 +121,6 @@ class SEMSocket():
         msg.send()
 
     def setStatus(self, status):
-        print("SetStatus:", status)
         # 0f 06 03 00 01 00 00 05 ff ff  -> on
         # 0f 06 03 00 00 00 00 04 ff ff  -> off
         cmd = bytearray([0x03])
@@ -127,7 +129,6 @@ class SEMSocket():
         msg.send()
 
     def login(self, password):
-        print("Login")
         self.password = password
         cmd = bytearray([0x17])
         payload = bytearray()
@@ -145,7 +146,6 @@ class SEMSocket():
         msg.send()
 
     def changePassword(self, newPassword):
-        print("Change Password")
         cmd = bytearray([0x17])
         payload = bytearray()
         payload.append(0x00)
@@ -161,6 +161,32 @@ class SEMSocket():
         self.password = newPassword
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
+
+    def __reconnect(self):
+        try:
+            self.btle_device = btle.Peripheral(self.mac_address,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
+            self.btle_handler = self.BTLEHandler(self)
+
+            self.custom_service = self.btle_device.getServiceByUUID(0xfff0)
+            self.read_char      = self.custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
+            self.write_char     = self.custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
+            self.notify_char    = self.custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
+            self.btle_device.setDelegate(self.btle_handler)
+        except btle.BTLEException as e:
+            self.connected = False
+        else:
+            self.connected = True
+
+    def reconnect(self, timeout = None):
+        if timeout == None:
+            self.__reconnect()
+        else:
+            reconnect_start = time.time()
+            while abs(reconnect_start - time.time()) < timeout or timeout == -1:
+                self.__reconnect()
+
+        if not self.connected:
+            raise self.NotConnectedException
 
     #def SynVer(self):
     #    print("SynVer")
