@@ -48,10 +48,8 @@ class SEMSocket():
         payload = bytearray()
         payload.append(0x00)
         payload.append(0x00)
-        payload.append(int(self.password[0]))
-        payload.append(int(self.password[1]))
-        payload.append(int(self.password[2]))
-        payload.append(int(self.password[3]))
+        for i in range(4):
+            payload.append(int(self.password[i]))
         payload.append(0x00)
         payload.append(0x00)
         payload.append(0x00)
@@ -64,14 +62,10 @@ class SEMSocket():
         payload = bytearray()
         payload.append(0x00)
         payload.append(0x01)
-        payload.append(int(newPassword[0]))
-        payload.append(int(newPassword[1]))
-        payload.append(int(newPassword[2]))
-        payload.append(int(newPassword[3]))
-        payload.append(int(self.password[0]))
-        payload.append(int(self.password[1]))
-        payload.append(int(self.password[2]))
-        payload.append(int(self.password[3]))
+        for i in range(4):
+            payload.append(int(self.newPassword[i]))
+        for i in range(4):
+            payload.append(int(self.password[i]))
         self.password = newPassword
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
@@ -138,8 +132,8 @@ class SEMSocket():
 
         def __init__(self, btle_device, cmd=bytearray(), payload=bytearray()):
             self.__btle_device = btle_device
-            self.__cmd = cmd
-            self.__payload = payload
+            self.cmd = cmd
+            self.payload = payload
 
         @property
         def cmd(self):
