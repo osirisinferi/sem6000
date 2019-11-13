@@ -16,7 +16,6 @@ class SEMSocket():
     _write_char = None
     _notify_char = None
     _btle_device = None
-    connected = False
 
     def __init__(self, mac, auto_reconnect_timeout = None):
         self.mac_address = mac
@@ -70,20 +69,19 @@ class SEMSocket():
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
 
-    def __reconnect(self):
+    @property
+    def connected(self):
         try:
-            self._btle_device = btle.Peripheral(self.mac_address,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
-            self._btle_handler = self.BTLEHandler(self)
+            if "conn" in self._btle_device.status().get("state"):
+                return True
+            else:
+                return False
+        except:
+            return False
 
-            self._custom_service = self._btle_device.getServiceByUUID(0xfff0)
-            self._read_char      = self._custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
-            self._write_char     = self._custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
-            self._notify_char    = self._custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
-            self._btle_device.setDelegate(self._btle_handler)
-        except btle.BTLEException as e:
-            self.connected = False
-        else:
-            self.connected = True
+    def __reconnect(self):
+        self.disconnect()
+        self.connect()
 
     def reconnect(self, timeout = None):
         if timeout == None:
@@ -95,6 +93,24 @@ class SEMSocket():
 
         if not self.connected:
             raise self.NotConnectedException
+
+    def connect(self):
+        self.disconnect()
+        if not self._btle_device:
+            self._btle_device = btle.Peripheral(self.mac_address,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
+        else:
+            self._btle_device.connect(self.mac_address)
+        self._btle_handler = self.BTLEHandler(self)
+
+        self._custom_service = self._btle_device.getServiceByUUID(0xfff0)
+        self._read_char      = self._custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
+        self._write_char     = self._custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
+        self._notify_char    = self._custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
+        self._btle_device.setDelegate(self._btle_handler)
+
+    def disconnect(self):
+        if self.connected == True:
+            self._btle_device.disconnect()
 
     #def SynVer(self):
     #    print("SynVer")
@@ -197,9 +213,7 @@ class SEMSocket():
                 self.__btle_device.powered = bool(data[4])
             elif message_type == 0x17:
                 if data[5] == 0x00 or data[5] == 0x01:
-                    if not data[4]:
-                        print("Login successful")
-                    else:
+                    if data[4]:
                         print("Login failed")
                 else:
                     print("5th byte of login-response is > 1:", data)
