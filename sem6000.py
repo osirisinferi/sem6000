@@ -20,6 +20,7 @@ class SEMSocket():
     def __init__(self, mac, auto_reconnect_timeout = None):
         self.mac_address = mac
         self.auto_reconnect_timeout = auto_reconnect_timeout
+        self._btle_device = btle.Peripheral(None ,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
         try:
             self.reconnect()
         except self.NotConnectedException:
@@ -96,10 +97,7 @@ class SEMSocket():
 
     def connect(self):
         self.disconnect()
-        if not self._btle_device:
-            self._btle_device = btle.Peripheral(self.mac_address,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
-        else:
-            self._btle_device.connect(self.mac_address)
+        self._btle_device.connect(self.mac_address)
         self._btle_handler = self.BTLEHandler(self)
 
         self._custom_service = self._btle_device.getServiceByUUID(0xfff0)
