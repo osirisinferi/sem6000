@@ -4,7 +4,6 @@ import uuid
 
 class SEMSocket():
     password = "0000"
-    auto_reconnect_timeout = None
     powered = False
     voltage = 0
     current = 0
@@ -17,9 +16,8 @@ class SEMSocket():
     _notify_char = None
     _btle_device = None
 
-    def __init__(self, mac, auto_reconnect_timeout = None):
+    def __init__(self, mac):
         self.mac_address = mac
-        self.auto_reconnect_timeout = auto_reconnect_timeout
         self._btle_device = btle.Peripheral(None ,addrType=btle.ADDR_TYPE_PUBLIC,iface=0)
         try:
             self.reconnect()
@@ -80,18 +78,9 @@ class SEMSocket():
         except:
             return False
 
-    def __reconnect(self):
+    def reconnect(self):
         self.disconnect()
         self.connect()
-
-    def reconnect(self, timeout = None):
-        if timeout == None:
-            self.__reconnect()
-        else:
-            reconnect_start = time.time()
-            while abs(reconnect_start - time.time()) < timeout or timeout == -1:
-                self.__reconnect()
-
         if not self.connected:
             raise self.NotConnectedException
 
@@ -182,7 +171,7 @@ class SEMSocket():
 
         def send(self):
             if not self.__btle_device.connected:
-                self.__btle_device.reconnect(self.__btle_device.auto_reconnect_timeout)
+                self.__btle_device.reconnect()
 
             self.__btle_device._write_char.write(self.__data, True)
             self.__btle_device._btle_device.waitForNotifications(5)
