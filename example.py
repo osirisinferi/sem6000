@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import time
 from sem6000 import SEMSocket
 
