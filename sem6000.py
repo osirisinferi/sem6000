@@ -1,5 +1,6 @@
 from bluepy import btle
 import time
+import datetime
 import uuid
 
 class SEMSocket():
@@ -37,6 +38,17 @@ class SEMSocket():
         # 0f 06 03 00 00 00 00 04 ff ff  -> off
         cmd = bytearray([0x03])
         payload = bytearray([0x00, status, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        msg.send()
+
+    def syncTime(self):
+        #15, 12, 1, 0, SECOND, MINUTE, HOUR_OF_DAY, DAY_OF_MONTH, MONTH (+1), int(YEAR/256), YEAR%256, 0, 0, CHKSUM, 255, 255
+        now = datetime.datetime.now()
+        cmd = bytearray([0x01])
+        payload = bytearray([0x00])
+        payload += bytearray([now.second, now.minute, now.hour])
+        payload += bytearray([now.day, now.month, int(now.year/256), now.year%256])
+        payload += bytearray([0x00, 0x00])
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
 
@@ -189,6 +201,8 @@ class SEMSocket():
                     print("Checksum error!")
                 else:
                     print("Unknown error:", data)
+            elif message_type == 0x01:
+                print("Time synced")
             elif message_type == 0x03: #switch toggle
                 print("Switch toggled")
                 self.__btle_device.getStatus()
