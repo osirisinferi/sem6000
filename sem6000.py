@@ -38,6 +38,13 @@ class SEMSocket():
         msg = self.BTLEMessage(self, cmd, payload)
         return msg.send()
 
+    def getSynConfig(self):
+        #15, 5, 16, 0, 0, 0, 17, -1, -1
+        cmd = bytearray([0x10])
+        payload = bytearray([0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        msg.send()
+
     def setStatus(self, status):
         # 0f 06 03 00 01 00 00 05 ff ff  -> on
         # 0f 06 03 00 00 00 00 04 ff ff  -> off
@@ -274,6 +281,13 @@ class SEMSocket():
                     self.__btle_device.power_factor = power / (voltage * current)
                 except ZeroDivisionError:
                     self.__btle_device.power_factor = None
+            elif message_type == 0x10:
+                print("ordinaryPrice:", data[5] / 100)
+                print("valleyPrice", data[6] / 100)
+                print("valleyStart", (data[7] << 8 | data[8]) / 60)
+                print("valleyEnd", (data[9] << 8 | data[10]) / 60)
+                icons = ["plug", "speaker", "flatscreen", "desk lamp", "oven", "kitchen machine", "canning pot", "stanging lamp", "kettle", "mixer", "hanging lamp", "toaster", "washing machine", "fan", "fridge", "iron", "printer", "monitor", "notebook", "workstation", "video recorder", "curling iron", "heater"]
+                print("iconName", data[12])
             elif message_type == 0x17: #authentication related response
                 if data[5] == 0x00 or data[5] == 0x01:
                     # in theory the fifth byte indicates a login attempt response (0) or a response to a password change (1)
