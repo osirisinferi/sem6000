@@ -29,7 +29,7 @@ while True:
         socket.setStatus(True)
         print("=== {} ({}) ===".format(socket.mac_address, "on" if socket.powered else "off"))
         print("\t{}V {}A → {}W@{}Hz (PF: {})".format(socket.voltage, socket.current, socket.power, socket.frequency, socket.power_factor))
-    except (SEMSocket.NotConnectedException, bluepy.btle.BTLEDisconnectError):
+    except (SEMSocket.NotConnectedException, bluepy.btle.BTLEDisconnectError, BrokenPipeError):
         print("Restarting...")
         if socket != None:
             socket.disconnect()
