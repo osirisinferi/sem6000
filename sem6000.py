@@ -8,6 +8,7 @@ class SEMSocket():
     voltage = 0
     current = 0
     power = 0
+    power_factor = 0
     frequency = 0
     mac_address = ""
     custom_service = None
@@ -193,11 +194,18 @@ class SEMSocket():
                 print("Switch toggled")
                 self.__btle_device.getStatus()
             elif message_type == 0x04: #status related data
-                self.__btle_device.voltage = data[8]
-                self.__btle_device.current = (data[9] << 8 | data[10]) / 1000
-                self.__btle_device.power = (data[5] << 16 | data[6] << 8 | data[7]) / 1000
+                voltage = data[8]
+                current = (data[9] << 8 | data[10]) / 1000
+                power   = (data[5] << 16 | data[6] << 8 | data[7]) / 1000
+
+                self.__btle_device.voltage = voltage
+                self.__btle_device.current = current
+                self.__btle_device.power   = power
                 self.__btle_device.frequency = data[11]
                 self.__btle_device.powered = bool(data[4])
+
+                # calculated values
+                self.__btle_device.power_factor = power / (voltage * current)
             elif message_type == 0x17:
                 if data[5] == 0x00 or data[5] == 0x01:
                     if data[4]:
