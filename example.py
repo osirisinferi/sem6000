@@ -18,7 +18,7 @@ while True:
             # -1: infinite retries
             # integer: seconds before exception is thrown
 
-            socket = SEMSocket('f0:c7:7f:0d:e7:17', auto_reconnect_timeout=None)
+            socket = SEMSocket('f0:c7:7f:0d:e7:17')
             print("Connected.")
 
             #socket.login("1337")
