@@ -208,7 +208,10 @@ class SEMSocket():
                 self.__btle_device.total_power = total_power
 
                 # calculated values
-                self.__btle_device.power_factor = power / (voltage * current)
+                try:
+                    self.__btle_device.power_factor = power / (voltage * current)
+                except ZeroDivisionError:
+                    self.__btle_device.power_factor = None
             elif message_type == 0x17:
                 if data[5] == 0x00 or data[5] == 0x01:
                     if data[4]:
