@@ -45,6 +45,13 @@ class SEMSocket():
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
 
+    def getSN(self):
+        # 15, 5, 17, 0, 0, 0, 18, -1, -1
+        cmd = bytearray([0x11])
+        payload = bytearray([0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        msg.send()
+
     def setStatus(self, status):
         # 0f 06 03 00 01 00 00 05 ff ff  -> on
         # 0f 06 03 00 00 00 00 04 ff ff  -> off
