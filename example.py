@@ -18,7 +18,7 @@ while True:
             # -1: infinite retries
             # integer: seconds before exception is thrown
 
-            socket = SEMSocket('f0:c7:7f:0d:e7:17', auto_reconnect_timeout=None)
+            socket = SEMSocket('f0:c7:7f:0d:e7:17')
             print("Connected.")
 
             #socket.login("1337")
@@ -28,8 +28,8 @@ while True:
         socket.getStatus()
         socket.setStatus(True)
         print("=== {} ({}) ===".format(socket.mac_address, "on" if socket.powered else "off"))
-        print("\t{}V {}A → {}W@{}Hz".format(socket.voltage, socket.current, socket.power, socket.frequency))
-    except (SEMSocket.NotConnectedException, bluepy.btle.BTLEDisconnectError):
+        print("\t{}V {}A → {}W@{}Hz (PF: {})".format(socket.voltage, socket.current, socket.power, socket.frequency, socket.power_factor))
+    except (SEMSocket.NotConnectedException, bluepy.btle.BTLEDisconnectError, BrokenPipeError):
         print("Restarting...")
         if socket != None:
             socket.disconnect()
