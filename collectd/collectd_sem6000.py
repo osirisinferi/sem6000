@@ -3,6 +3,7 @@
 # vim: noet ts=2 sw=2 sts=2
 
 import os
+import time
 import collectd
 
 from sem6000 import SEMSocket
@@ -25,6 +26,12 @@ def config_func(cfg):
 		if key in ['address', 'socketname']:
 			config[key] = value
 
+		if key == 'readtimeout':
+			config['readtimeout'] = int(value)
+
+		if key == 'suspendtime':
+			config['suspendtime'] = int(value)
+
 	if 'address' not in config.keys():
 		collectd.error('sem6000: address must be set')
 		return
@@ -32,13 +39,33 @@ def config_func(cfg):
 	if 'socketname' not in config.keys():
 		config['socketname'] = config['address'].replace(':', '')
 
-	instances.append( {'config': config, 'socket': None} )
+	if 'readtimeout' not in config.keys():
+		config['readtimeout'] = 30
+
+	if 'suspendtime' not in config.keys():
+		config['suspendtime'] = 300
+
+	instances.append( {
+		'config': config,
+		'socket': None,
+		'suspended': False,
+		'lastsuccess': 0,
+		'resumetime': 0
+		} )
 
 def read_func():
 	global instances
 
 	for inst in instances:
 		config = inst['config']
+
+		if inst['suspended']:
+			if time.time() < inst['resumetime']:
+				continue
+			else:
+				collectd.info("sem6000: Device {} waking up.".format(config['address']))
+				inst['suspended'] = False
+				inst['lastsuccess'] = time.time()
 
 		try:
 			if inst['socket'] == None:
@@ -52,6 +79,13 @@ def read_func():
 			collectd.warning("sem6000: Exception caught: {}".format(e))
 			collectd.warning("sem6000: Restarting on next cycle...")
 
+			if inst['lastsuccess'] < time.time() - config['readtimeout']:
+				collectd.error("sem6000: no successful communication with {} for {:.1f} seconds. Suspending device for {:.1f} seconds.".format(
+					config['address'], config['readtimeout'], config['suspendtime']))
+
+				inst['suspended'] = True
+				inst['resumetime'] = time.time() + config['suspendtime']
+
 			if inst['socket'] != None:
 				inst['socket'].disconnect()
 				inst['socket'] = None
@@ -60,6 +94,8 @@ def read_func():
 
 		if socket != None and socket.voltage != 0:
 			collectd.debug("Uploading values for {}".format(socket.mac_address))
+
+			inst['lastsuccess'] = time.time()
 
 			val = collectd.Values(plugin = 'sem6000-{}'.format(config['socketname']))
 

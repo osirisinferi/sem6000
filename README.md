@@ -40,6 +40,8 @@ Add or adjust the configuration for your collectd’s Python plugin as follows:
   <Module collectd_sem6000>
     Address "12:34:56:78:90:ab"
     SocketName "FirstSocket"
+    ReadTimeout 30
+    SuspendTime 300
   </Module>
   <Module collectd_sem6000>
     Address "ab:cd:ef:13:37:42"
@@ -48,6 +50,14 @@ Add or adjust the configuration for your collectd’s Python plugin as follows:
   # ...
 </Plugin>
 ```
+
+`ReadTimeout` and `SuspendTime` control what’s happening when a device is
+unavailable. If no value could be retrieved for `ReadTimeout` seconds, the
+plugin does not retry for `SuspendTime` seconds. After that, normal operation
+is resumed. This procedure ensures that an unreachable device does not block
+other devices (too often) in the current single-threaded architecture.
+
+If not specified, `ReadTimeout` is 30 seconds and `SuspendTime` is 5 minutes.
 
 Make sure that everything listed in `requirements.txt` is available to the user
 running collectd.
