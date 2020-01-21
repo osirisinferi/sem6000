@@ -7,7 +7,7 @@ import time
 import collectd
 
 from sem6000 import SEMSocket
-import bluepy
+from bluepy.btle import BTLEDisconnectError
 
 instances = []
 
@@ -75,7 +75,7 @@ def read_func():
 				collectd.info("sem6000: Connected.")
 
 			inst['socket'].getStatus()
-		except (SEMSocket.NotConnectedException, bluepy.btle.BTLEDisconnectError, BrokenPipeError) as e:
+		except (SEMSocket.NotConnectedException, BTLEDisconnectError, BrokenPipeError) as e:
 			collectd.warning("sem6000: Exception caught: {}".format(e))
 			collectd.warning("sem6000: Restarting on next cycle...")
 
