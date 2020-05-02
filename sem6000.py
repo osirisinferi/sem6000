@@ -63,7 +63,7 @@ class SEMSocket():
         payload.append(0x00)
         payload.append(0x01)
         for i in range(4):
-            payload.append(int(self.newPassword[i]))
+            payload.append(int(newPassword[i]))
         for i in range(4):
             payload.append(int(self.password[i]))
         self.password = newPassword
