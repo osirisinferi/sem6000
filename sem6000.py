@@ -231,14 +231,21 @@ class SEMSocket():
             self.__btle_device = btle_device
 
         def handleNotification(self, cHandle, data):
+            if len(data) <= 3:
+                print("Notification data seems invalid or incomplete. Could not parse: ", end="")
+                print(data)
+                return
+
             message_type = data[2]
             if message_type == 0x00:
                 if data[4] == 0x01:
                     print("Checksum error!")
                 else:
                     print("Unknown error:", data)
-            elif message_type == 0x01:
-                print("Time synced")
+            elif message_type == 0x01: #sync time response
+                if not data[3:] == b'\x00\x00\x02\xff\xff':
+                    print("Time synced failed with unknown data: ", end="")
+                    print(data)
             elif message_type == 0x02: #set name response
                 if not data[3:] == b'\x00\x00\x03\xff\xff':
                     print("Set name failed with unknown data: ", end="")
@@ -271,6 +278,10 @@ class SEMSocket():
                     self.__btle_device.authenticated = not data[4]
                 else:
                     print("5th byte of login-response is > 1:", data)
+            elif message_type == 0x0f: #set icon response
+                if not data[3:] == b'\x00\x03\x00\x13\xff\xff':
+                    print("Unknown response for setting icon: ", end="")
+                    print(data[3:])
             else:
                 print ("Unknown message from Handle: 0x" + format(cHandle,'02X') + " Value: "+ format(data))
 
