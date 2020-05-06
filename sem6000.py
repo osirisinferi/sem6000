@@ -14,6 +14,7 @@ class SEMSocket():
     frequency = 0
     mac_address = ""
     custom_service = None
+    authenticated = False
     _read_char = None
     _write_char = None
     _notify_char = None
@@ -33,7 +34,7 @@ class SEMSocket():
         cmd = bytearray([0x04])
         payload = bytearray([0x00, 0x00, 0x00])
         msg = self.BTLEMessage(self, cmd, payload)
-        msg.send()
+        return msg.send()
 
     def setStatus(self, status):
         # 0f 06 03 00 01 00 00 05 ff ff  -> on
@@ -41,7 +42,7 @@ class SEMSocket():
         cmd = bytearray([0x03])
         payload = bytearray([0x00, status, 0x00, 0x00])
         msg = self.BTLEMessage(self, cmd, payload)
-        msg.send()
+        return msg.send()
 
     def syncTime(self):
         #15, 12, 1, 0, SECOND, MINUTE, HOUR_OF_DAY, DAY_OF_MONTH, MONTH (+1), int(YEAR/256), YEAR%256, 0, 0, CHKSUM, 255, 255
@@ -52,7 +53,7 @@ class SEMSocket():
         payload += bytearray([now.day, now.month, int(now.year/256), now.year%256])
         payload += bytearray([0x00, 0x00])
         msg = self.BTLEMessage(self, cmd, payload)
-        msg.send()
+        return msg.send()
 
     def login(self, password):
         self.password = password
@@ -67,7 +68,9 @@ class SEMSocket():
         payload.append(0x00)
         payload.append(0x00)
         msg = self.BTLEMessage(self, cmd, payload)
-        msg.send()
+        success = msg.send()
+        self.authenticated = self.authenticated and success
+        return success
 
     def changePassword(self, newPassword):
         cmd = bytearray([0x17])
@@ -80,15 +83,14 @@ class SEMSocket():
             payload.append(int(self.password[i]))
         self.password = newPassword
         msg = self.BTLEMessage(self, cmd, payload)
-        msg.send()
+        success = msg.send()
+        self.authenticated = self.authenticated and success
+        return success
 
     @property
     def connected(self):
         try:
-            if "conn" in self._btle_device.status().get("state"):
-                return True
-            else:
-                return False
+            return "conn" in self._btle_device.status().get("state")
         except:
             return False
 
@@ -188,7 +190,7 @@ class SEMSocket():
                 self.__btle_device.reconnect()
 
             self.__btle_device._write_char.write(self.__data, True)
-            self.__btle_device._btle_device.waitForNotifications(5)
+            return self.__btle_device._btle_device.waitForNotifications(5)
 
 
     class BTLEHandler(btle.DefaultDelegate):
@@ -206,7 +208,6 @@ class SEMSocket():
             elif message_type == 0x01:
                 print("Time synced")
             elif message_type == 0x03: #switch toggle
-                print("Switch toggled")
                 self.__btle_device.getStatus()
             elif message_type == 0x04: #status related data
                 voltage     = data[8]
@@ -228,9 +229,12 @@ class SEMSocket():
                     self.__btle_device.power_factor = None
             elif message_type == 0x17:
                 if data[5] == 0x00 or data[5] == 0x01:
-                    if data[4]:
-                        print("Login failed")
+                    # in theory the fifth byte indicates a login attempt response (0) or a response to a password change (1)
+                    # but since a password change requires a valid login and a successful password changes logs you in,
+                    # we can just ignore this bit and set the authenticated flag accordingly for both responses
+                    self.__btle_device.authenticated = not data[4]
                 else:
                     print("5th byte of login-response is > 1:", data)
             else:
                 print ("Unknown message from Handle: 0x" + format(cHandle,'02X') + " Value: "+ format(data))
+
