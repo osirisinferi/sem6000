@@ -15,9 +15,11 @@ class SEMSocket():
     mac_address = ""
     custom_service = None
     authenticated = False
+    _name = None
     _read_char = None
     _write_char = None
     _notify_char = None
+    _name_char = None
     _btle_device = None
 
     def __init__(self, mac):
@@ -88,6 +90,31 @@ class SEMSocket():
         return success
 
     @property
+    def name(self):
+        self._name = self._name_char.read().decode("UTF-8")
+        return self._name
+
+    @name.setter
+    def name(self, newName):
+        newName = newName.encode("UTF-8")
+        cmd = bytearray([0x02])
+        payload = bytearray()
+        payload.append(0x02)
+        for i in range(20):
+            if i <= (len(newName) - 1):
+                payload.append(newName[i])
+            else:
+                payload.append(0x00)
+        msg = self.BTLEMessage(self, cmd, payload)
+        success = msg.send()
+        # For some reason the original app sets the first 7 bytes of the payload to zero and sends it again.
+        # However, a first test showed, that this really doesn't change anything. If it becomes neccessary here's a first draft:
+        #for i in range(7):
+        #    payload[i+1] = 0x00
+        #msg = self.BTLEMessage(self, cmd, payload)
+        if not success: raise self.SendMessageFailed
+
+    @property
     def connected(self):
         try:
             return "conn" in self._btle_device.status().get("state")
@@ -109,6 +136,8 @@ class SEMSocket():
         self._read_char      = self._custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
         self._write_char     = self._custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
         self._notify_char    = self._custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
+        self._name_char      = self._custom_service.getCharacteristics("0000fff6-0000-1000-8000-00805f9b34fb")[0]
+
         self._btle_device.setDelegate(self._btle_handler)
 
     def disconnect(self):
@@ -140,6 +169,9 @@ class SEMSocket():
     #    #self.GetSN()
 
     class NotConnectedException(Exception):
+        pass
+
+    class SendMessageFailed(Exception):
         pass
 
     class BTLEMessage():
@@ -207,9 +239,13 @@ class SEMSocket():
                     print("Unknown error:", data)
             elif message_type == 0x01:
                 print("Time synced")
-            elif message_type == 0x03: #switch toggle
+            elif message_type == 0x02: #set name response
+                if not data[3:] == b'\x00\x00\x03\xff\xff':
+                    print("Set name failed with unknown data: ", end="")
+                    print(data)
+            elif message_type == 0x03: #switch toggle response
                 self.__btle_device.getStatus()
-            elif message_type == 0x04: #status related data
+            elif message_type == 0x04: #status related response
                 voltage     = data[8]
                 current     = (data[9] << 8 | data[10]) / 1000
                 power       = (data[5] << 16 | data[6] << 8 | data[7]) / 1000
@@ -227,7 +263,7 @@ class SEMSocket():
                     self.__btle_device.power_factor = power / (voltage * current)
                 except ZeroDivisionError:
                     self.__btle_device.power_factor = None
-            elif message_type == 0x17:
+            elif message_type == 0x17: #authentication related response
                 if data[5] == 0x00 or data[5] == 0x01:
                     # in theory the fifth byte indicates a login attempt response (0) or a response to a password change (1)
                     # but since a password change requires a valid login and a successful password changes logs you in,
