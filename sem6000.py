@@ -15,9 +15,11 @@ class SEMSocket():
     mac_address = ""
     custom_service = None
     authenticated = False
+    _name = None
     _read_char = None
     _write_char = None
     _notify_char = None
+    _name_char = None
     _btle_device = None
 
     def __init__(self, mac):
@@ -88,6 +90,32 @@ class SEMSocket():
         return success
 
     @property
+    def name(self):
+        self._name = self._name_char.read().decode("UTF-8")
+        return self._name
+
+    @name.setter
+    def name(self, newName):
+        newNameBytes = newName.encode("UTF-8")
+        cmd = bytearray([0x02])
+        payload = bytearray()
+        payload.append(0x02)
+        for i in range(20):
+            if i <= (len(newNameBytes) - 1):
+                payload.append(newNameBytes[i])
+            else:
+                payload.append(0x00)
+        msg = self.BTLEMessage(self, cmd, payload)
+        success = msg.send()
+        # For some reason the original app sets the first 7 bytes of the payload to zero and sends it again.
+        # However, a first test showed, that this really doesn't change anything. If it becomes neccessary here's a first draft:
+        #for i in range(7):
+        #    payload[i+1] = 0x00
+        #msg = self.BTLEMessage(self, cmd, payload)
+        if not success: raise self.SendMessageFailed
+        if self.name != newName: raise self.NotLoggedIn
+
+    @property
     def connected(self):
         try:
             return "conn" in self._btle_device.status().get("state")
@@ -109,6 +137,8 @@ class SEMSocket():
         self._read_char      = self._custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
         self._write_char     = self._custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
         self._notify_char    = self._custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
+        self._name_char      = self._custom_service.getCharacteristics("0000fff6-0000-1000-8000-00805f9b34fb")[0]
+
         self._btle_device.setDelegate(self._btle_handler)
 
     def disconnect(self):
@@ -140,6 +170,12 @@ class SEMSocket():
     #    #self.GetSN()
 
     class NotConnectedException(Exception):
+        pass
+
+    class SendMessageFailed(Exception):
+        pass
+
+    class NotLoggedIn(Exception):
         pass
 
     class BTLEMessage():
@@ -199,17 +235,28 @@ class SEMSocket():
             self.__btle_device = btle_device
 
         def handleNotification(self, cHandle, data):
+            if len(data) <= 3:
+                print("Notification data seems invalid or incomplete. Could not parse: ", end="")
+                print(data)
+                return
+
             message_type = data[2]
             if message_type == 0x00:
                 if data[4] == 0x01:
                     print("Checksum error!")
                 else:
                     print("Unknown error:", data)
-            elif message_type == 0x01:
-                print("Time synced")
-            elif message_type == 0x03: #switch toggle
+            elif message_type == 0x01: #sync time response
+                if not data[3:] == b'\x00\x00\x02\xff\xff':
+                    print("Time synced failed with unknown data: ", end="")
+                    print(data)
+            elif message_type == 0x02: #set name response
+                if not data[3:] == b'\x00\x00\x03\xff\xff':
+                    print("Set name failed with unknown data: ", end="")
+                    print(data)
+            elif message_type == 0x03: #switch toggle response
                 self.__btle_device.getStatus()
-            elif message_type == 0x04: #status related data
+            elif message_type == 0x04: #status related response
                 voltage     = data[8]
                 current     = (data[9] << 8 | data[10]) / 1000
                 power       = (data[5] << 16 | data[6] << 8 | data[7]) / 1000
@@ -227,7 +274,7 @@ class SEMSocket():
                     self.__btle_device.power_factor = power / (voltage * current)
                 except ZeroDivisionError:
                     self.__btle_device.power_factor = None
-            elif message_type == 0x17:
+            elif message_type == 0x17: #authentication related response
                 if data[5] == 0x00 or data[5] == 0x01:
                     # in theory the fifth byte indicates a login attempt response (0) or a response to a password change (1)
                     # but since a password change requires a valid login and a successful password changes logs you in,
@@ -235,6 +282,10 @@ class SEMSocket():
                     self.__btle_device.authenticated = not data[4]
                 else:
                     print("5th byte of login-response is > 1:", data)
+            elif message_type == 0x0f: #set icon response
+                if not data[3:] == b'\x00\x03\x00\x13\xff\xff':
+                    print("Unknown response for setting icon: ", end="")
+                    print(data[3:])
             else:
                 print ("Unknown message from Handle: 0x" + format(cHandle,'02X') + " Value: "+ format(data))
 
