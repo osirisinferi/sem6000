@@ -96,13 +96,13 @@ class SEMSocket():
 
     @name.setter
     def name(self, newName):
-        newName = newName.encode("UTF-8")
+        newNameBytes = newName.encode("UTF-8")
         cmd = bytearray([0x02])
         payload = bytearray()
         payload.append(0x02)
         for i in range(20):
-            if i <= (len(newName) - 1):
-                payload.append(newName[i])
+            if i <= (len(newNameBytes) - 1):
+                payload.append(newNameBytes[i])
             else:
                 payload.append(0x00)
         msg = self.BTLEMessage(self, cmd, payload)
@@ -113,6 +113,7 @@ class SEMSocket():
         #    payload[i+1] = 0x00
         #msg = self.BTLEMessage(self, cmd, payload)
         if not success: raise self.SendMessageFailed
+        if self.name != newName: raise self.NotLoggedIn
 
     @property
     def connected(self):
@@ -172,6 +173,9 @@ class SEMSocket():
         pass
 
     class SendMessageFailed(Exception):
+        pass
+
+    class NotLoggedIn(Exception):
         pass
 
     class BTLEMessage():
