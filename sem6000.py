@@ -4,6 +4,7 @@ import datetime
 import uuid
 
 class SEMSocket():
+    icons = ["plug", "speaker", "flatscreen", "desk lamp", "oven", "kitchen machine", "canning pot", "stanging lamp", "kettle", "mixer", "hanging lamp", "toaster", "washing machine", "fan", "fridge", "iron", "printer", "monitor", "notebook", "workstation", "video recorder", "curling iron", "heater"]
     password = "0000"
     powered = False
     voltage = 0
@@ -15,6 +16,7 @@ class SEMSocket():
     mac_address = ""
     custom_service = None
     authenticated = False
+    _icon_idx = None
     _name = None
     _read_char = None
     _write_char = None
@@ -37,6 +39,20 @@ class SEMSocket():
         payload = bytearray([0x00, 0x00, 0x00])
         msg = self.BTLEMessage(self, cmd, payload)
         return msg.send()
+
+    def getSynConfig(self):
+        #15, 5, 16, 0, 0, 0, 17, -1, -1
+        cmd = bytearray([0x10])
+        payload = bytearray([0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        msg.send()
+
+    def getSN(self):
+        # 15, 5, 17, 0, 0, 0, 18, -1, -1
+        cmd = bytearray([0x11])
+        payload = bytearray([0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        msg.send()
 
     def setStatus(self, status):
         # 0f 06 03 00 01 00 00 05 ff ff  -> on
@@ -149,25 +165,9 @@ class SEMSocket():
     #    print("SynVer")
     #    self.read_char.read_value()
 
-    #def GetSynConfig(self):
-    #    print("GetSynConfig")
-    #    #15, 5, 16, 0, 0, 0, 17, -1, -1
-    #    self.write_char.write_value(bytearray(b'\x0f\x05\x10\x00\x00\x00\x11\xff\xff'))
-
     #def ______RESET(self):
     #    #15, 5, 16, 0, 0, 0, 17, -1, -1  ??? maybe reset?
     #    pass
-
-    #def GetSN(self):
-    #    print("GetSN")
-    #    #15, 5, 17, 0, 0, 0, 18, -1, -1
-    #    self.write_char.write_value(bytearray(b'\x0f\x05\x11\x00\x00\x00\x12\xff\xff'))
-
-    #    self.SynVer()
-    #    self.notify_char.enable_notifications()
-    #    self.Login("1337")
-    #    self.GetSynConfig()
-    #    #self.GetSN()
 
     class NotConnectedException(Exception):
         pass
@@ -274,6 +274,16 @@ class SEMSocket():
                     self.__btle_device.power_factor = power / (voltage * current)
                 except ZeroDivisionError:
                     self.__btle_device.power_factor = None
+            elif message_type == 0x10:
+                self.__btle_device.default_charge = (data[5] / 100)
+                self.__btle_device.night_charge = (data[6] / 100)
+                night_charge_start_time = int((data[7] << 8 | data[8]) / 60)
+                night_charge_end_time = int((data[9] << 8 | data[10]) / 60)
+                self.__btle_device.night_charge_start_time = time.strptime(str(night_charge_start_time), "%H")
+                self.__btle_device.night_charge_end_time = time.strptime(str(night_charge_end_time), "%H")
+                self.__btle_device.night_mode = not bool(data[11])
+                self.__btle_device.icon_idx = data[12]
+                self.__btle_device.power_protect = (data[13] << 8 | data[14])
             elif message_type == 0x17: #authentication related response
                 if data[5] == 0x00 or data[5] == 0x01:
                     # in theory the fifth byte indicates a login attempt response (0) or a response to a password change (1)
