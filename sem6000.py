@@ -18,9 +18,8 @@ class SEMSocket():
     authenticated = False
     _icon_idx = None
     _name = None
-    _read_char = None
+    _version_char = None
     _write_char = None
-    _notify_char = None
     _name_char = None
     _btle_device = None
 
@@ -148,14 +147,12 @@ class SEMSocket():
         self.disconnect()
         self._btle_device.connect(self.mac_address)
         self._btle_handler = self.BTLEHandler(self)
+        self._btle_device.setDelegate(self._btle_handler)
 
         self._custom_service = self._btle_device.getServiceByUUID(0xfff0)
-        self._read_char      = self._custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0]
-        self._write_char     = self._custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0]
-        self._notify_char    = self._custom_service.getCharacteristics("0000fff4-0000-1000-8000-00805f9b34fb")[0]
+        self._version_char   = self._custom_service.getCharacteristics("0000fff1-0000-1000-8000-00805f9b34fb")[0] #contains firmware version info
+        self._write_char     = self._custom_service.getCharacteristics("0000fff3-0000-1000-8000-00805f9b34fb")[0] #is used to write commands
         self._name_char      = self._custom_service.getCharacteristics("0000fff6-0000-1000-8000-00805f9b34fb")[0]
-
-        self._btle_device.setDelegate(self._btle_handler)
 
     def disconnect(self):
         if self.connected == True:
