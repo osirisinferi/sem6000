@@ -97,6 +97,20 @@ class SEMSocket():
         self.authenticated = self.authenticated and success
         return success
 
+    def clearHistory(self):
+        cmd = bytearray([0x15])
+        payload = bytearray([0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        success = msg.send()
+        return success
+
+    def factoryReset(self):
+        cmd = bytearray([0x15])
+        payload = bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        success = msg.send()
+        return success
+
     @property
     def name(self):
         self._name = self._name_char.read().decode("UTF-8")
