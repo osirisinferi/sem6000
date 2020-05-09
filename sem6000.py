@@ -46,13 +46,6 @@ class SEMSocket():
         msg = self.BTLEMessage(self, cmd, payload)
         msg.send()
 
-    def getSN(self):
-        # 15, 5, 17, 0, 0, 0, 18, -1, -1
-        cmd = bytearray([0x11])
-        payload = bytearray([0x00, 0x00, 0x00])
-        msg = self.BTLEMessage(self, cmd, payload)
-        msg.send()
-
     def setStatus(self, status):
         # 0f 06 03 00 01 00 00 05 ff ff  -> on
         # 0f 06 03 00 00 00 00 04 ff ff  -> off
@@ -127,8 +120,28 @@ class SEMSocket():
         #for i in range(7):
         #    payload[i+1] = 0x00
         #msg = self.BTLEMessage(self, cmd, payload)
-        if not success: raise self.SendMessageFailed
-        if self.name != newName: raise self.NotLoggedIn
+        if not success:
+            raise self.SendMessageFailed
+        if self.name != newName:
+            raise self.NotLoggedIn
+
+    @property
+    def serial(self):
+        # 15, 5, 17, 0, 0, 0, 18, -1, -1
+        cmd = bytearray([0x11])
+        payload = bytearray([0x00, 0x00, 0x00])
+        msg = self.BTLEMessage(self, cmd, payload)
+        success = msg.send()
+        if not success:
+            raise self.SendMessageFailed
+        return self._serial
+
+    @property
+    def firmware_version(self):
+        char_value = self._version_char.read()
+        major = char_value[11]
+        minor = char_value[12]
+        return "{}.{}".format(major, minor)
 
     @property
     def connected(self):
@@ -157,10 +170,6 @@ class SEMSocket():
     def disconnect(self):
         if self.connected == True:
             self._btle_device.disconnect()
-
-    #def SynVer(self):
-    #    print("SynVer")
-    #    self.read_char.read_value()
 
     #def ______RESET(self):
     #    #15, 5, 16, 0, 0, 0, 17, -1, -1  ??? maybe reset?
@@ -271,7 +280,7 @@ class SEMSocket():
                     self.__btle_device.power_factor = power / (voltage * current)
                 except ZeroDivisionError:
                     self.__btle_device.power_factor = None
-            elif message_type == 0x10:
+            elif message_type == 0x10: #plug settings response
                 self.__btle_device.default_charge = (data[5] / 100)
                 self.__btle_device.night_charge = (data[6] / 100)
                 night_charge_start_time = int((data[7] << 8 | data[8]) / 60)
@@ -281,6 +290,8 @@ class SEMSocket():
                 self.__btle_device.night_mode = not bool(data[11])
                 self.__btle_device.icon_idx = data[12]
                 self.__btle_device.power_protect = (data[13] << 8 | data[14])
+            elif message_type == 0x11: #serial number response
+                self.__btle_device._serial = data[-16:].decode("UTF-8")
             elif message_type == 0x17: #authentication related response
                 if data[5] == 0x00 or data[5] == 0x01:
                     # in theory the fifth byte indicates a login attempt response (0) or a response to a password change (1)
